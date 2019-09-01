@@ -83,7 +83,7 @@ class Database
             case DatabaseObject::T_Binary:
                 $sql .= "Binary({$finfo['length']})";
                 break;
-            case DatabaseObject::T_Object:
+            case DatabaseObject::T_DbObject:
                 $sql .= 'Int Unsigned';
                 break;
             case DatabaseObject::T_Integer:
@@ -223,7 +223,7 @@ class Database
         }
     }
 
-    function createTable($tbclass, Array $fields, Array $unique)
+    function createTable($tbclass, Array $fields, Array $unique, $addts = true, $idbytes = 4)
     {
         $idx = [];
         $foreign = [];
@@ -236,7 +236,7 @@ class Database
                 $field['prev'] = $prev;
                 $prev = $fname;
                 
-                if ($field['type'] == DatabaseObject::T_Object) {
+                if ($field['type'] == DatabaseObject::T_DbObject) {
                     $idx[$fname] = $fname;
                     $foreign[$fname] = $field;
                 }
@@ -271,15 +271,34 @@ class Database
             }
         }
         
-        $sql = "Create Table [[$tbclass]] (" . '"id" Int Unsigned Not Null Primary Key AUTO_INCREMENT';
+        switch ((int) $idbytes){
+            case 1:
+                $idt = 'TinyInt';
+                break;
+            case 2:
+                $idt = 'SmallInt';
+                break;
+            case 3:
+                $idt = 'MediumInt';
+                break;
+            case 4:
+                $idt = 'Int';
+                break;
+            default:
+                $idt = 'BigInt';
+        }
+                
+        $sql = "Create Table [[$tbclass]] (" . '"id" '.$idt.' Unsigned Not Null Primary Key AUTO_INCREMENT';
         foreach ($fields as $fname => $finfo) {
             $sql .= ',' . $this->escapeField($fname) . $this->fieldType($finfo);
-            if ($finfo['type'] == DatabaseObject::T_Object) {
+            if ($finfo['type'] == DatabaseObject::T_DbObject) {
                 $idx[$fname] = $fname;
                 $foreign[$fname] = $finfo;
             }
         }
-        $sql .= ', "added" Timestamp Not Null Default CURRENT_TIMESTAMP' . ', "updated" Timestamp Not Null Default CURRENT_TIMESTAMP On Update CURRENT_TIMESTAMP' . ') ENGINE=InnoDB Default CharSet=utf8mb4';
+        if ($addts){
+            $sql .= ', "added" Timestamp Not Null Default CURRENT_TIMESTAMP' . ', "updated" Timestamp Not Null Default CURRENT_TIMESTAMP On Update CURRENT_TIMESTAMP' . ') ENGINE=InnoDB Default CharSet=utf8mb4';
+        }
         $this->query($sql);
         
         $this->createIndexes($tbclass, $unique, $idx, $foreign);
@@ -359,15 +378,17 @@ class Database
      * @param mixed $max
      * @return mixed
      */
-    function setting($name, $default = '', $min = null, $max = null)
+    function setting($name, $default = '', $min = null, $max = null, $dynamic = false)
     {
         if (! isset($this->settings[$name])) {
             if (is_bool($default) or is_int($default) or is_float($default)) {
-                $val = var_export($default);
+                $val = var_export($default,1);
             } else {
                 $val = $default = (string) $default;
             }
-            $this->query('Insert Into [[*settings]] ("data","value") ' . 'Values (' . $this->escape($name) . ',' . $this->escape($val) . ')');
+            if (!$dynamic){
+                $this->query('Insert Into [[*settings]] ("data","value") ' . 'Values (' . $this->escape($name) . ',' . $this->escape($val) . ')');
+            }
             return $this->settings[$name] = $default;
         }
         $value = $this->settings[$name];
@@ -410,9 +431,11 @@ class Database
         return $value;
     }
 
-    function logError($error)
+    function logError(\SimpleXMLElement $error)
     {
-        $sql = 'Insert Into [[*errorLog]] ("content") Values (' . $this->escape($error) . ')';
+        $error = $error->saveXML();
+        $error = $this->escape($error);
+        $sql = 'Insert Into [[*errorLog]] ("content") Values (' . $error . ')';
         $this->query($sql);
         
         $maxentries = $this->setting('max-log-entries', 100, 5);

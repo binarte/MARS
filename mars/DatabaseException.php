@@ -5,9 +5,10 @@ class DatabaseException extends \exception {
 	
 	
 	function __construct(\mysqli $conn,$sql){
-		parent::__construct($conn->error,$conn->errno);
+		parent::__construct($conn->error,500);
 		$this->sql = $sql;
 		$this->conn = $conn;
+		$this->dbErrNo = $conn->errno;
 	}
 	
 	private $sql;
@@ -18,5 +19,10 @@ class DatabaseException extends \exception {
 	private $conn;
 	function getConn(){
 		return $this->conn;
+	}
+	
+	private $dbErrNo;
+	function getDbErrNo(){
+	    return $this->dbErrNo;
 	}
 }

@@ -4,7 +4,7 @@ namespace mars;
 abstract class OwnedObject extends DatabaseObject {
 	static protected $fieldInfo = [
 		'owner' => [
-			'type' => self::T_Object,
+			'type' => self::T_DbObject,
 			'class' => __NAMESPACE__.'\\User',
 			'cascade' => true,
 		],

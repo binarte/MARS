@@ -24,7 +24,7 @@ class DataNotFoundException extends \Exception {
 			$istr = (string) $id;
 		}		
 		
-		parent::__construct('Could not find data of type \''.get_class($obj). '\' with the id '.$istr,0,$previous);
+		parent::__construct('Could not find data of type \''.get_class($obj). '\' with the id '.$istr,System::HS_NotFound,$previous);
 		$this->obj = $obj;
 		$this->id = $id;
 	}
